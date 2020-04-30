@@ -1,5 +1,10 @@
 # healthbrian
 
+## Used Technologies
+Front-end framework: [Vue.js](http://vuejs.org/)
+
+UI Library: [Bootstrap-vue](https://bootstrap-vue.org/)
+
 ## How to use run the each components
 Open the component directory. (ex. recommendation-card).
 
