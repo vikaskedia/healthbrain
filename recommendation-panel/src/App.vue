@@ -1,17 +1,24 @@
 <template>
   <div>
-    <b-card>
+    <b-card
+      :border-variant="style == 1 ? '' : 'dark'"
+      :header="style == 1 ? '' : 'dark'"
+      :header-bg-variant="style == 1 ? '' : 'dark'"
+      :header-text-variant="style == 1 ? 'black' : 'white'"
+    >
       <template v-slot:header>
-        <b-row align-h="between">
-          <h4 class="mb-0">Recommendation Panel</h4>
+        <b-row align-h="between" :style="{height: style == 1 ? '50px' : '30px'}">
+          <h5 v-if="style == 1" class="m-md-2">Recommendation Panel</h5>
+          <span style="font-weight: bold;" v-if="style == 2">Recommendation Panel</span>
           <b-row class="mr-2">
-            <b-button variant="primary" @click="showAddModal">Add</b-button>
-            <b-button
-              class="ml-2"
-              variant="danger"
-              v-if="selected.length > 0"
-              @click="multiDelete"
-            >Delete</b-button>
+            <b-button variant="primary" v-if="selected.length == 0" @click="showAddModal">Add</b-button>
+            <b-button variant="danger" v-if="selected.length > 0" @click="multiDelete">Delete</b-button>
+
+            <b-dropdown v-model="style" :text="`Style ${style}`" right class="ml-2">
+              <b-dropdown-item @click="style=1" :active="style == 1">Style1</b-dropdown-item>
+              <b-dropdown-divider></b-dropdown-divider>
+              <b-dropdown-item @click="style=2" :active="style == 2">Style2</b-dropdown-item>
+            </b-dropdown>
           </b-row>
         </b-row>
       </template>
@@ -24,14 +31,20 @@
           @row-selected="onRowSelected"
           responsive="sm"
           :fields="fields"
+          :small="style == 2"
         >
           <!-- Example scoped slot for select state illustrative purposes -->
           <template v-slot:cell(action)="item">
-            <b-button variant="outline-primary" @click="openEditModal(item)">Edit</b-button>
+            <b-button
+              variant="outline-primary"
+              :size="style == 1 ? '' :'sm'"
+              @click="openEditModal(item)"
+            >Edit</b-button>
             <b-button
               variant="outline-danger"
               @click="deleteRecommendation(item)"
               class="ml-2"
+              :size="style == 1 ? '' :'sm'"
             >Delete</b-button>
           </template>
         </b-table>
@@ -70,6 +83,8 @@
 <script>
 import uniqid from "uniqid";
 import store from "./store/index.js";
+import axios from "axios";
+const API_URL = "http://localhost:3000/recommendations";
 
 export default {
   name: "RecommendationPanel",
@@ -81,7 +96,8 @@ export default {
         description: ""
       },
       selected: [],
-      modalType: 1 // 1: add, 2: edit
+      modalType: 1, // 1: add, 2: edit
+      style: 1
     };
   },
   computed: {
@@ -97,6 +113,7 @@ export default {
   },
   mounted() {
     this.onEventListener();
+    this.getRecommendationsFromServer();
   },
   methods: {
     onRowSelected(items) {
@@ -118,6 +135,7 @@ export default {
           "event_recommendation_panel",
           JSON.stringify(this.items)
         );
+        await axios.post(API_URL, this.data);
       } else {
         let newList = [];
         this.items.forEach(item => {
@@ -136,6 +154,7 @@ export default {
           "event_recommendation_panel",
           JSON.stringify(newList)
         );
+        await axios.put(`${API_URL}/${this.data.id}`, this.data);
       }
       this.modalShow = false;
     },
@@ -157,6 +176,9 @@ export default {
         }
       });
 
+      const data = this.items[item.index];
+      await axios.delete(`${API_URL}/${data.id}`);
+
       store.commit("setRecommendationList", newList);
       localStorage.setItem(
         "event_recommendation_panel",
@@ -165,23 +187,29 @@ export default {
     },
     multiDelete() {
       let newList = [];
-      this.items.forEach(item => {
+      let index = 0;
+      this.items.forEach(async item => {
         let isDeleted = false;
         this.selected.forEach(selectedItem => {
           if (item.id == selectedItem.id) {
             isDeleted = true;
           }
         });
-        if (!isDeleted) {
+
+        if (isDeleted) {
+          await axios.delete(`${API_URL}/${item.id}`);
+        } else {
           newList.push(item);
         }
-      });
 
-      store.commit("setRecommendationList", newList);
-      localStorage.setItem(
-        "event_recommendation_panel",
-        JSON.stringify(newList)
-      );
+        if (++index == this.items.length) {
+          store.commit("setRecommendationList", newList);
+          localStorage.setItem(
+            "event_recommendation_card",
+            JSON.stringify(newList)
+          );
+        }
+      });
     },
     onEventListener() {
       setInterval(function() {
@@ -194,6 +222,10 @@ export default {
           localStorage.removeItem("event_recommendation_card");
         }
       }, 100);
+    },
+    async getRecommendationsFromServer() {
+      const { data } = await axios.get(API_URL);
+      store.commit("setRecommendationList", data);
     }
   }
 };

@@ -1,22 +1,24 @@
 <template>
   <div>
     <b-card
-      border-variant="info"
-      header="info"
-      header-bg-variant="info"
+      :border-variant="style == 1 ? 'info' : 'dark'"
+      :header="style == 1 ? 'info' : 'dark'"
+      :header-bg-variant="style == 1 ? 'info' : 'dark'"
       header-text-variant="white"
     >
       <template v-slot:header>
-        <b-row align-h="between">
-          <h5 class="mb-0">Reminder Card</h5>
+        <b-row align-h="between" :style="{height: style == 1 ? '50px' : '30px'}">
+          <h5 v-if="style == 1" class="m-md-2">Reminder Card</h5>
+          <span style="font-weight: bold;" v-if="style == 2">Reminder Card</span>
           <b-row class="mr-2">
-            <b-button variant="primary" @click="showAddModal">Add</b-button>
-            <b-button
-              class="ml-2"
-              variant="danger"
-              v-if="selected.length > 0"
-              @click="multiDelete"
-            >Delete</b-button>
+            <b-button variant="primary" v-if="selected.length == 0" @click="showAddModal">Add</b-button>
+            <b-button variant="danger" v-if="selected.length > 0" @click="multiDelete">Delete</b-button>
+
+            <b-dropdown v-model="style" :text="`Style ${style}`" right class="ml-2">
+              <b-dropdown-item @click="style=1" :active="style == 1">Style1</b-dropdown-item>
+              <b-dropdown-divider></b-dropdown-divider>
+              <b-dropdown-item @click="style=2" :active="style == 2">Style2</b-dropdown-item>
+            </b-dropdown>
           </b-row>
         </b-row>
       </template>
@@ -30,14 +32,20 @@
           @row-selected="onRowSelected"
           responsive="sm"
           :fields="fields"
+          :small="style == 2"
         >
           <!-- Example scoped slot for select state illustrative purposes -->
           <template v-slot:cell(action)="item">
-            <b-button variant="outline-primary" @click="openEditModal(item)">Edit</b-button>
+            <b-button
+              :size="style == 1 ? '' :'sm'"
+              variant="outline-primary"
+              @click="openEditModal(item)"
+            >Edit</b-button>
             <b-button
               variant="outline-danger"
               @click="deleteReminder(item)"
               class="ml-2"
+              :size="style == 1 ? '' : 'sm'"
             >Delete</b-button>
           </template>
         </b-table>
@@ -76,6 +84,8 @@
 <script>
 import uniqid from "uniqid";
 import store from "./store/index";
+import axios from "axios";
+const API_URL = "http://localhost:3000/reminders";
 export default {
   name: "ReminderCard",
   data() {
@@ -86,7 +96,8 @@ export default {
         description: ""
       },
       selected: [],
-      modalType: 1 // 1: add, 2: edit
+      modalType: 1, // 1: add, 2: edit
+      style: 1
     };
   },
   computed: {
@@ -102,6 +113,7 @@ export default {
   },
   mounted() {
     this.onEventListener();
+    this.getRemindersFromServer();
   },
   methods: {
     onRowSelected(items) {
@@ -119,10 +131,8 @@ export default {
         this.data["id"] = uniqid();
 
         store.commit("addReminder", this.data);
-        localStorage.setItem(
-          "event_reminder_card",
-          JSON.stringify(this.items)
-        );
+        localStorage.setItem("event_reminder_card", JSON.stringify(this.items));
+        await axios.post(API_URL, this.data);
       } else {
         let newList = [];
         this.items.forEach(item => {
@@ -137,10 +147,8 @@ export default {
           }
         });
         store.commit("setReminderList", newList);
-        localStorage.setItem(
-          "event_reminder_card",
-          JSON.stringify(newList)
-        );
+        localStorage.setItem("event_reminder_card", JSON.stringify(newList));
+        await axios.put(`${API_URL}/${this.data.id}`, this.data);
       }
       this.modalShow = false;
     },
@@ -161,31 +169,34 @@ export default {
         }
       });
 
+      const data = this.items[item.index];
+      await axios.delete(`${API_URL}/${data.id}`);
+
       store.commit("setReminderList", newList);
-      localStorage.setItem(
-        "event_reminder_card",
-        JSON.stringify(newList)
-      );
+      localStorage.setItem("event_reminder_card", JSON.stringify(newList));
     },
     multiDelete() {
       let newList = [];
-      this.items.forEach(item => {
+      let index = 0;
+      this.items.forEach(async item => {
         let isDeleted = false;
         this.selected.forEach(selectedItem => {
           if (item.id == selectedItem.id) {
             isDeleted = true;
           }
         });
-        if (!isDeleted) {
+
+        if (isDeleted) {
+          await axios.delete(`${API_URL}/${item.id}`);
+        } else {
           newList.push(item);
         }
-      });
 
-      store.commit("setReminderList", newList);
-      localStorage.setItem(
-        "event_reminder_card",
-        JSON.stringify(newList)
-      );
+        if (++index == this.items.length) {
+          store.commit("setReminderList", newList);
+          localStorage.setItem("event_reminder_card", JSON.stringify(newList));
+        }
+      });
     },
     onEventListener() {
       setInterval(function() {
@@ -198,6 +209,11 @@ export default {
           localStorage.removeItem("event_reminder_panel");
         }
       }, 100);
+    },
+    async getRemindersFromServer() {
+      const { data } = await axios.get(API_URL);
+
+      store.commit("setReminderList", data);
     }
   }
 };
