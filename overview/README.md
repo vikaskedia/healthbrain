@@ -1,8 +1,5 @@
 # overview
 
-## Introduction
-This application is an overview application which contains 4 components in milestone1.
-
 ## Project setup
 ```
 npm install
