@@ -7,7 +7,8 @@ Vue.use(Vuex)
 
 export default new Vuex.Store({
   state: {
-    reminders: []
+    reminders: [],
+    reminderPanelStyle: {}
   },
   mutations: {
     addReminder(state, newData) {
@@ -15,6 +16,10 @@ export default new Vuex.Store({
     },
     setReminderList(state, data) {
       state.reminders = data
+    },
+    saveStyle(state, data) {
+      const { patientId, style } = data
+      state.reminderPanelStyle[`${patientId}`] = style
     }
   },
   actions: {

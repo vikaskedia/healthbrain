@@ -84,13 +84,12 @@
 <script>
 import uniqid from "uniqid";
 import store from "./store/index";
-import axios from "axios";
+
 const API_URL = "http://localhost:3000/recommendations";
 export default {
   name: "RecommendationCard",
   data() {
     return {
-      fields: ["description", "createdAt", "action"],
       modalShow: false,
       data: {
         description: ""
@@ -109,11 +108,30 @@ export default {
     },
     items() {
       return store.state.recommendations;
+    },
+    fields() {
+      if (this.selected.length > 0) {
+        return ["description", "createdAt"];
+      } else {
+        return ["description", "createdAt", "action"];
+      }
+    },
+    id() {
+      const queryString = window.location.search;
+      const urlParams = new URLSearchParams(queryString);
+      const patientId = urlParams.get("patient_id");
+      return patientId;
     }
   },
   mounted() {
     this.onEventListener();
     this.getRecommendationsFromServer();
+    this.loadStyle();
+  },
+  watch: {
+    style() {
+      store.commit("saveStyle", { patientId: this.id, style: this.style });
+    }
   },
   methods: {
     onRowSelected(items) {
@@ -129,13 +147,21 @@ export default {
         const today = new Date();
         this.data["createdAt"] = today.toDateString();
         this.data["id"] = uniqid();
+        this.data["patientId"] = this.id;
 
         store.commit("addRecommendation", this.data);
         localStorage.setItem(
           "event_recommendation_card",
           JSON.stringify(this.items)
         );
-        await axios.post(API_URL, this.data);
+
+        await fetch(API_URL, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json;charset=utf-8"
+          },
+          body: JSON.stringify(this.data)
+        });
       } else {
         let newList = [];
         this.items.forEach(item => {
@@ -154,7 +180,14 @@ export default {
           "event_recommendation_card",
           JSON.stringify(newList)
         );
-        await axios.put(`${API_URL}/${this.data.id}`, this.data);
+
+        await fetch(`${API_URL}/${this.data.id}`, {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json;charset=utf-8"
+          },
+          body: JSON.stringify(this.data)
+        });
       }
       this.modalShow = false;
     },
@@ -176,7 +209,8 @@ export default {
       });
 
       const data = this.items[item.index];
-      await axios.delete(`${API_URL}/${data.id}`);
+
+      await fetch(`${API_URL}/${data.id}`, { method: "DELETE" });
 
       store.commit("setRecommendationList", newList);
       localStorage.setItem(
@@ -196,7 +230,7 @@ export default {
         });
 
         if (isDeleted) {
-          await axios.delete(`${API_URL}/${item.id}`);
+          await fetch(`${API_URL}/${item.id}`, { method: "DELETE" });
         } else {
           newList.push(item);
         }
@@ -223,8 +257,20 @@ export default {
       }, 100);
     },
     async getRecommendationsFromServer() {
-      const { data } = await axios.get(API_URL);
-      store.commit("setRecommendationList", data);
+      const response = await fetch(`${API_URL}?patientId=${this.id}`);
+      if (response.ok) {
+        let json = await response.json();
+
+        store.commit("setRecommendationList", json);
+      } else {
+        console.log(response.status);
+      }
+    },
+    loadStyle() {
+      const style = store.state.recommendationCardStyle[`${this.id}`];
+      if (style != null) {
+        this.style = style;
+      }
     }
   }
 };

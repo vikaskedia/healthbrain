@@ -7,7 +7,8 @@ Vue.use(Vuex)
 
 export default new Vuex.Store({
   state: {
-    recommendations: []
+    recommendations: [],
+    recommendationPanelStyle: {}
   },
   mutations: {
     addRecommendation(state, newData) {
@@ -15,6 +16,10 @@ export default new Vuex.Store({
     },
     setRecommendationList(state, data) {
       state.recommendations = data
+    },
+    saveStyle(state, data) {
+      const { patientId, style } = data
+      state.recommendationPanelStyle[`${patientId}`] = style
     }
   },
   actions: {

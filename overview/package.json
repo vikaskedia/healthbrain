@@ -10,10 +10,10 @@
   "dependencies": {
     "bootstrap-vue": "^2.1.0",
     "core-js": "^3.6.4",
-    "recommendation-card": "0.0.20",
-    "recommendation-panel": "0.0.9",
-    "reminder-card": "0.0.2",
-    "reminder-panel": "0.0.2",
+    "recommendation-card": "0.0.23",
+    "recommendation-panel": "0.0.12",
+    "reminder-card": "0.0.3",
+    "reminder-panel": "0.0.3",
     "vue": "^2.6.11",
     "vue-dynamic": "^0.4.0"
   },
