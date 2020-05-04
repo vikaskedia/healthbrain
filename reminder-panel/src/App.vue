@@ -13,12 +13,6 @@
           <b-row class="mr-2">
             <b-button variant="primary" v-if="selected.length == 0" @click="showAddModal">Add</b-button>
             <b-button variant="danger" v-if="selected.length > 0" @click="multiDelete">Delete</b-button>
-
-            <b-dropdown v-model="style" :text="`Style ${style}`" right class="ml-2">
-              <b-dropdown-item @click="style=1" :active="style == 1">Style1</b-dropdown-item>
-              <b-dropdown-divider></b-dropdown-divider>
-              <b-dropdown-item @click="style=2" :active="style == 2">Style2</b-dropdown-item>
-            </b-dropdown>
           </b-row>
         </b-row>
       </template>
@@ -84,7 +78,9 @@
 import uniqid from "uniqid";
 import store from "./store/index";
 
-const API_URL = "http://localhost:3000/reminders";
+const REMINDER_API_URL = "http://localhost:3000/reminders";
+const STYLE_API_URL = "http://localhost:3000/style";
+const ADD_DIALOG = 1;
 export default {
   name: "ReminderPanel",
   data() {
@@ -95,7 +91,8 @@ export default {
       },
       selected: [],
       modalType: 1, // 1: add, 2: edit
-      style: 1
+      style: 1,
+      timer: -1
     };
   },
   computed: {
@@ -106,7 +103,9 @@ export default {
       return this.modalType == 1 ? "Add Reminder" : "Edit Reminder";
     },
     items() {
-      return store.state.reminders;
+      return store.state.reminders.filter(item => {
+        return item.patientId == this.id;
+      });
     },
     fields() {
       if (this.selected.length > 0) {
@@ -142,7 +141,7 @@ export default {
       this.data = { description: "" };
     },
     async save() {
-      if (this.modalType == 1) {
+      if (this.modalType == ADD_DIALOG) {
         const today = new Date();
         this.data["createdAt"] = today.toDateString();
         this.data["id"] = uniqid();
@@ -154,7 +153,7 @@ export default {
           JSON.stringify(this.items)
         );
 
-        await fetch(API_URL, {
+        await fetch(REMINDER_API_URL, {
           method: "POST",
           headers: {
             "Content-Type": "application/json;charset=utf-8"
@@ -177,7 +176,7 @@ export default {
         store.commit("setReminderList", newList);
         localStorage.setItem("event_reminder_panel", JSON.stringify(newList));
 
-        await fetch(`${API_URL}/${this.data.id}`, {
+        await fetch(`${REMINDER_API_URL}/${this.data.id}`, {
           method: "PUT",
           headers: {
             "Content-Type": "application/json;charset=utf-8"
@@ -206,7 +205,7 @@ export default {
 
       const data = this.items[item.index];
 
-      await fetch(`${API_URL}/${data.id}`, { method: "DELETE" });
+      await fetch(`${REMINDER_API_URL}/${data.id}`, { method: "DELETE" });
 
       store.commit("setReminderList", newList);
       localStorage.setItem("event_reminder_panel", JSON.stringify(newList));
@@ -223,7 +222,9 @@ export default {
         });
 
         if (isDeleted) {
-          await fetch(`${API_URL}/${item.id}`, { method: "DELETE" });
+          await fetch(`${REMINDER_API_URL}/${item.id}`, {
+            method: "DELETE"
+          });
         } else {
           newList.push(item);
         }
@@ -235,7 +236,7 @@ export default {
       });
     },
     onEventListener() {
-      setInterval(function() {
+      this.timer = setInterval(function() {
         const event_reminder_panel = localStorage.getItem(
           "event_reminder_card"
         );
@@ -247,7 +248,7 @@ export default {
       }, 100);
     },
     async getRemindersFromServer() {
-      const response = await fetch(`${API_URL}?patientId=${this.id}`);
+      const response = await fetch(`${REMINDER_API_URL}?patientId=${this.id}`);
       if (response.ok) {
         let json = await response.json();
 
@@ -256,12 +257,16 @@ export default {
         console.log(response.status);
       }
     },
-    loadStyle() {
-      const style = store.state.reminderPanelStyle[`${this.id}`];
-      if (style != null) {
-        this.style = style;
+    async loadStyle() {
+      const response = await fetch(STYLE_API_URL);
+      if (response.ok) {
+        const json = await response.json();
+        this.style = json.value;
       }
     }
+  },
+  beforeDestroy() {
+    clearInterval(this.timer);
   }
 };
 </script>

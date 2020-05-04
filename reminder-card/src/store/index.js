@@ -14,7 +14,23 @@ export default new Vuex.Store({
       state.reminders.push(newData)
     },
     setReminderList(state, data) {
-      state.reminders = data
+      const queryString = window.location.search;
+      const urlParams = new URLSearchParams(queryString);
+      const patientId = urlParams.get("patient_id");
+      let newList = []
+      state.reminders.forEach(item => {
+        console.log(item)
+        if (item.patientId != patientId) {
+          newList.push(item)
+        }
+      })
+      if (data.length > 0) {
+        data.forEach(item => {
+          newList.push(item)
+        })
+      }
+
+      state.reminders = newList
     },
     saveStyle(state, data) {
       const { patientId, style } = data

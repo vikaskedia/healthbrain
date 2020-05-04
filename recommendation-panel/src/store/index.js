@@ -15,7 +15,23 @@ export default new Vuex.Store({
       state.recommendations.push(newData)
     },
     setRecommendationList(state, data) {
-      state.recommendations = data
+      const queryString = window.location.search;
+      const urlParams = new URLSearchParams(queryString);
+      const patientId = urlParams.get("patient_id");
+      let newList = []
+      state.recommendations.forEach(item => {
+        console.log(item)
+        if (item.patientId != patientId) {
+          newList.push(item)
+        }
+      })
+      if (data.length > 0) {
+        data.forEach(item => {
+          newList.push(item)
+        })
+      }
+
+      state.recommendations = newList
     },
     saveStyle(state, data) {
       const { patientId, style } = data
