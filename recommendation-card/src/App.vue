@@ -1,15 +1,18 @@
 <template>
   <div>
+    <div style="background: grey">
+      <b-spinner variant="primary" label="Text Centered"></b-spinner>
+    </div>
     <b-card
-      :border-variant="style == 1 ? 'info' : 'dark'"
-      :header="style == 1 ? 'info' : 'dark'"
-      :header-bg-variant="style == 1 ? 'info' : 'dark'"
+      :border-variant="isStyle1 ? 'info' : 'dark'"
+      :header="isStyle1 ? 'info' : 'dark'"
+      :header-bg-variant="isStyle1 ? 'info' : 'dark'"
       header-text-variant="white"
     >
       <template v-slot:header>
-        <b-row align-h="between" :style="{height: style == 1 ? '50px' : '30px'}">
-          <h5 v-if="style == 1" class="m-md-2">Recommendation Card</h5>
-          <span style="font-weight: bold;" v-if="style == 2">Recommendation Card</span>
+        <b-row align-h="between" :style="{height: isStyle1 ? '50px' : '30px'}">
+          <h5 v-if="isStyle1" class="m-md-2">Recommendation Card</h5>
+          <span style="font-weight: bold;" v-else>Recommendation Card</span>
           <b-row class="mr-2">
             <b-button variant="primary" v-if="selected.length == 0" @click="showAddModal">Add</b-button>
             <b-button variant="danger" v-if="selected.length > 0" @click="multiDelete">Delete</b-button>
@@ -26,11 +29,11 @@
           @row-selected="onRowSelected"
           responsive="sm"
           :fields="fields"
-          :small="style == 2"
+          :small="!isStyle1"
         >
           <template v-slot:cell(action)="item">
             <b-button
-              :size="style == 1 ? '' :'sm'"
+              :size="isStyle1 ? '' :'sm'"
               variant="outline-primary"
               @click="openEditModal(item)"
             >Edit</b-button>
@@ -38,7 +41,7 @@
               variant="outline-danger"
               @click="deleteRecommendation(item)"
               class="ml-2"
-              :size="style == 1 ? '' : 'sm'"
+              :size="isStyle1 ? '' : 'sm'"
             >Delete</b-button>
           </template>
         </b-table>
@@ -67,7 +70,7 @@
             size="sm"
             @click="save"
             :disabled="!validation"
-          >{{modalType == 1 ? "Save" : "Update"}}</b-button>
+          >{{modalDialogButton}}</b-button>
         </div>
       </template>
     </b-modal>
@@ -81,6 +84,8 @@ import store from "./store/index";
 const RECOMMENDATION_API_URL = "http://localhost:3000/recommendations";
 const STYLE_API_URL = "http://localhost:3000/style";
 const ADD_DIALOG = 1;
+const STYLE_1 = 1;
+
 export default {
   name: "RecommendationCard",
   data() {
@@ -90,8 +95,8 @@ export default {
         description: ""
       },
       selected: [],
-      modalType: 1, // 1: add, 2: edit    // Refactor: Define const, do not use magic-constants.
-      style: 1,
+      modalType: ADD_DIALOG, // 1: add, 2: edit    // Refactor: Define const, do not use magic-constants.
+      style: STYLE_1,
       timer: -1
     };
   },
@@ -100,7 +105,9 @@ export default {
       return this.data.description.length > 0;
     },
     modalTitle() {
-      return this.modalType == 1 ? "Add Recommendation" : "Edit Recommendation";
+      return this.modalType == ADD_DIALOG
+        ? "Add Recommendation"
+        : "Edit Recommendation";
     },
     items() {
       return store.state.recommendations.filter(item => {
@@ -119,6 +126,12 @@ export default {
       const urlParams = new URLSearchParams(queryString);
       const patientId = urlParams.get("patient_id");
       return patientId;
+    },
+    isStyle1() {
+      return this.style == STYLE_1;
+    },
+    modalDialogButton() {
+      return this.modalType == ADD_DIALOG ? "Save" : "Update";
     }
   },
   mounted() {
@@ -126,24 +139,13 @@ export default {
     this.getRecommendationsFromServer();
     this.loadStyle();
   },
-  watch: {
-    /* Bug:
-      Style is not specific to patient ID
-    
-      Question:
-      Why is this needed?
-    */
-    style() {
-      store.commit("saveStyle", { patientId: this.id, style: this.style });
-    }
-  },
   methods: {
     onRowSelected(items) {
       this.selected = items;
     },
     showAddModal() {
       this.modalShow = true;
-      this.modalType = 1;
+      this.modalType = ADD_DIALOG;
       this.data = { description: "" };
     },
     async save() {
@@ -162,19 +164,35 @@ export default {
           There is a possibility that 3rd step will fail. In that case a error message needs to be shown to the user and the data removed from vuex store and localstorage.
         
         */
-        store.commit("addRecommendation", this.data);
-        localStorage.setItem(
-          "event_recommendation_card",
-          JSON.stringify(this.items)
-        );
 
-        await fetch(RECOMMENDATION_API_URL, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json;charset=utf-8"
-          },
-          body: JSON.stringify(this.data)
-        });
+        try {
+          const response = await fetch(RECOMMENDATION_API_URL, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json;charset=utf-8"
+            },
+            body: JSON.stringify(this.data)
+          });
+          if (response.ok) {
+            store.commit("addRecommendation", this.data);
+            localStorage.setItem(
+              "event_recommendation_card",
+              JSON.stringify(this.items)
+            );
+          } else {
+            this.$bvToast.toast("Failed to add data.", {
+              title: "Error",
+              variant: "danger",
+              solid: true
+            });
+          }
+        } catch (ex) {
+          this.$bvToast.toast("Server connection error", {
+            title: "Error",
+            variant: "danger",
+            solid: true
+          });
+        }
       } else {
         let newList = [];
         this.items.forEach(item => {
@@ -296,8 +314,7 @@ export default {
           Now doctor is working on wrong data.
           When API calls need to show to doctor "Error is loading latest data. Click here to refresh"
         */
-
-} else {
+      } else {
         console.log(response.status);
       }
     },
@@ -307,6 +324,9 @@ export default {
         const json = await response.json();
         this.style = json.value;
       }
+    },
+    getStyleClass() {
+      return this.style == STYLE_1 ? "info" : "dark";
     }
   },
   beforeDestroy() {
