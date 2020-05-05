@@ -6,6 +6,7 @@ Vue.use(Vuex)
 
 export default new Vuex.Store({
   state: {
+    // For doc read file:///gt/sc-prog-repos/healthbrain/recommendation-card/src/store/index.js  
     reminders: [],
     reminderCardStyle: {}
   },

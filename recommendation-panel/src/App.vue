@@ -147,6 +147,8 @@ export default {
         this.data["id"] = uniqid();
         this.data["patientId"] = this.id;
 
+        // For doc read file:///gt/sc-prog-repos/healthbrain/recommendation-card/src/App.vue   
+
         store.commit("addRecommendation", this.data);
         localStorage.setItem(
           "event_recommendation_panel",

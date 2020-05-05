@@ -90,7 +90,7 @@ export default {
         description: ""
       },
       selected: [],
-      modalType: 1, // 1: add, 2: edit
+      modalType: 1, // 1: add, 2: edit    // Refactor: Define const, do not use magic-constants.
       style: 1,
       timer: -1
     };
@@ -127,6 +127,12 @@ export default {
     this.loadStyle();
   },
   watch: {
+    /* Bug:
+      Style is not specific to patient ID
+    
+      Question:
+      Why is this needed?
+    */
     style() {
       store.commit("saveStyle", { patientId: this.id, style: this.style });
     }
@@ -147,6 +153,15 @@ export default {
         this.data["id"] = uniqid();
         this.data["patientId"] = this.id;
 
+        /* 
+          When a new recommendation is added the data is being saved at 3 places:
+          1. vuex store
+          2. localstorage
+          3. Server by calling API 
+
+          There is a possibility that 3rd step will fail. In that case a error message needs to be shown to the user and the data removed from vuex store and localstorage.
+        
+        */
         store.commit("addRecommendation", this.data);
         localStorage.setItem(
           "event_recommendation_card",
@@ -262,8 +277,27 @@ export default {
       );
       if (response.ok) {
         let json = await response.json();
+        /*
+          Question:
+          What if the data returned from the server is same as the data in the vuex store.
+          Current code does not check if server-data=vuex-data and without checking updates vuex data
+          This may result in all view components getting re-rendered without need.
+        */
         store.commit("setRecommendationList", json);
-      } else {
+        /* 
+          Bug:
+          localstorage needs to be updated with the result of the API call
+          Reason: Say locastorage has 3 entries the API returns 0 entries. 
+          On refresh it will flash 3 entries and then go back to 0 entries.
+        */
+        /* 
+          Edge-case:
+          Localstroage has 3 entries. Server has 0 entries. API call fails. 
+          Now doctor is working on wrong data.
+          When API calls need to show to doctor "Error is loading latest data. Click here to refresh"
+        */
+
+} else {
         console.log(response.status);
       }
     },
